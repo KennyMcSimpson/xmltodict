@@ -200,7 +200,8 @@ Lists that are specified under a key in a dictionary use the key as a tag for ea
 
 Parse XML input into a Python dictionary.
 
-- `xml_input`: XML input as a string, file-like object, or generator of strings.
+- `xml_input`: XML input as a string, binary or text file-like object (including
+  `StringIO`), or generator of strings.
 - `encoding=None`: Character encoding for the input XML.
 - `expat=expat`: XML parser module to use.
 - `process_namespaces=False`: Expand XML namespaces if True.

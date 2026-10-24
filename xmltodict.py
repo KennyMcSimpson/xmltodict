@@ -209,7 +209,8 @@ def parse(xml_input, encoding=None, expat=expat, process_namespaces=False,
           namespace_separator=':', disable_entities=True, process_comments=False, **kwargs):
     """Parse the given XML input and convert it into a dictionary.
 
-    `xml_input` can either be a `string`, a file-like object, or a generator of strings.
+    `xml_input` can either be a `string`, a binary or text file-like object,
+    or a generator of strings.
 
     If `xml_attribs` is `True`, element attributes are put in the dictionary
     among regular child elements, using `@` as a prefix to avoid collisions. If
@@ -368,7 +369,11 @@ def parse(xml_input, encoding=None, expat=expat, process_namespaces=False,
 
         parser.EntityDeclHandler = _forbid_entities
     if hasattr(xml_input, 'read'):
-        parser.ParseFile(xml_input)
+        while True:
+            chunk = xml_input.read(2048)
+            parser.Parse(chunk, not chunk)
+            if not chunk:
+                break
     elif isgenerator(xml_input):
         for chunk in xml_input:
             parser.Parse(chunk, False)

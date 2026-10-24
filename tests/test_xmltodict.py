@@ -1,7 +1,7 @@
 from xmltodict import parse, ParsingInterrupted
 import collections
 import pytest
-from io import BytesIO
+from io import BytesIO, StringIO
 
 from xml.parsers.expat import ParserCreate
 from xml.parsers import expat
@@ -10,6 +10,53 @@ from xml.parsers import expat
 def test_string_vs_file():
     xml = '<a>data</a>'
     assert parse(xml) == parse(BytesIO(xml.encode('ascii')))
+
+
+@pytest.mark.parametrize(
+    'xml', ['<a>data</a>', '<a>' + '\u00e9' * 5000 + '</a>'],
+    ids=['ascii', 'multichunk-unicode'],
+)
+def test_string_vs_text_stream(xml):
+    assert parse(StringIO(xml)) == parse(xml)
+
+
+@pytest.mark.parametrize('encoding', ['utf-8', 'utf-16', 'iso-8859-1'])
+@pytest.mark.parametrize('text_mode', [False, True])
+def test_file_encoding(tmp_path, encoding, text_mode):
+    xml = f'<?xml version="1.0" encoding="{encoding}"?><a>caf\u00e9</a>'
+    path = tmp_path / 'document.xml'
+    path.write_text(xml, encoding=encoding)
+    source = path.open(encoding=encoding) if text_mode else path.open('rb')
+    with source:
+        assert parse(source) == {'a': 'caf\u00e9'}
+        assert not source.closed
+    assert source.closed
+
+
+def test_text_stream_item_callback():
+    items = []
+
+    def handle(path, item):
+        items.append((path[:], item))
+        return True
+
+    source = StringIO('<root><item>one</item><item>two</item></root>')
+    assert parse(source, item_depth=2, item_callback=handle) is None
+    assert items == [
+        ([('root', None), ('item', None)], 'one'),
+        ([('root', None), ('item', None)], 'two'),
+    ]
+
+
+def test_text_stream_rejects_malformed_xml():
+    with pytest.raises(expat.ExpatError):
+        parse(StringIO('<root><item></root>'))
+
+
+def test_text_stream_disables_entities_by_default():
+    xml = '<!DOCTYPE root [<!ENTITY example "value">]><root>&example;</root>'
+    with pytest.raises(ValueError, match='entities are disabled'):
+        parse(StringIO(xml))
 
 
 def test_minimal():
